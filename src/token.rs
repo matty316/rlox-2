@@ -17,7 +17,7 @@ pub(crate) enum TokenType {
 pub(crate) struct Token {
     pub(crate) token_type: TokenType,
     pub(crate) lexeme: String,
-    pub(crate) literal: Option<Box<dyn Any>>,
+    pub(crate) literal: Box<dyn Any>,
     pub(crate) line: u32,
 }
 
@@ -26,12 +26,12 @@ impl Token {
         Token {
             token_type: t,
             lexeme: lexeme.to_string(),
-            literal: Some(Box::new(literal)),
+            literal: Box::new(literal),
             line: line,
         }
     }
 
     pub(crate) fn new_empty(t: TokenType, line: u32) -> Self {
-        Token { token_type: t, lexeme: "".to_string(), literal: None, line: line }
+        Token { token_type: t, lexeme: "".to_string(), literal: Box::new(""), line: line }
     }
 }

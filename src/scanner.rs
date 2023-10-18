@@ -84,9 +84,16 @@ impl Scanner {
                     self.add_empty_token(SLASH);
                 }
             }
+            b'"' => self.string(),
             b'\n' => self.line += 1,
             b' ' | b'\t' | b'\r' => (),
-            _ => Lox::error(self.line, ""),
+            _ => {
+                if Self::is_digit(c) {
+                    self.number();
+                } else {
+                    Lox::error(self.line, "Unexpected char")
+                }
+            }
         }
     }
 
@@ -95,6 +102,12 @@ impl Scanner {
         if self.is_at_end() { return b'\0'; }
 
         return self.input.as_bytes()[self.current];
+    }
+
+    fn peek_next(&self) -> u8 {
+        if self.current + 1 >= self.input.len() { return b'\0'; }
+
+        return self.input.as_bytes()[self.current + 1];
     }
 
     fn advance(&mut self) -> u8 {
@@ -125,9 +138,46 @@ impl Scanner {
         self.current += 1;
         return true;
     }
+
+    fn string(&mut self) {
+        while self.peek() != b'"' && !self.is_at_end() {
+            if self.peek() == b'\n' { self.line += 1; }
+            self.advance();
+        }
+
+        if self.is_at_end() {
+            Lox::error(self.line, "Unterminated string.");
+            return;
+        }
+
+        self.advance();
+
+        let s = &self.input[self.start+1..self.current-1];
+        self.add_token(STRING, s.to_string())
+    }
+
+    fn number(&mut self) {
+        while Self::is_digit(self.peek()) { self.advance(); }
+
+        if self.peek() == b'.'  && Self::is_digit(self.peek_next()) {
+            self.advance();
+
+            while Self::is_digit(self.peek()) { self.advance(); }
+        }
+
+        let s = &self.input[self.start..self.current];
+        let n: f64 = s.parse().unwrap();
+        self.add_token(NUM, n)
+    }
+
+    fn is_digit(c: u8) -> bool {
+        b'0' <= c && c <= b'9'
+    }
 }
 
 mod tests {
+    use std::any::TypeId;
+
     use super::*;
         
     #[test]
@@ -168,6 +218,53 @@ mod tests {
         let tokens = s.scan_tokens();
         for (i, e) in exp.into_iter().enumerate() {
             assert_eq!(e.line, tokens[i].line)
+        }
+    }
+
+    #[test]
+    fn test_strings() {
+        let input = r#"
+            "string"
+        "#;
+        
+        let mut s = Scanner::new(input.to_string());
+        let tokens = s.scan_tokens();
+        let t = &tokens[0];
+        assert_eq!(t.token_type, STRING);
+        assert_eq!(t.lexeme, "\"string\"");
+        let s: &String = t.literal.downcast_ref().unwrap();
+        assert_eq!(s, &"string".to_string());
+    } 
+
+    #[test]
+    fn test_numbers() {
+        let input = "1
+        34
+        69
+        420
+        6.9
+        42.0
+        ";
+
+        let exp = vec![
+            Token::new(NUM, "1", 1.0, 1),
+            Token::new(NUM, "34", 34.0, 1),
+            Token::new(NUM, "69", 69.0, 1),
+            Token::new(NUM, "420", 420.0, 1),
+            Token::new(NUM, "6.9", 6.9, 1),
+            Token::new(NUM, "42.0", 42.0, 1),
+        ];
+
+        let mut s = Scanner::new(input.to_string());
+        let tokens = s.scan_tokens();
+
+        for (i, e) in exp.into_iter().enumerate() {
+            let t = &tokens[i];
+            assert_eq!(e.token_type, NUM);
+            assert_eq!(e.lexeme, t.lexeme);
+            let n: &f64 = t.literal.downcast_ref().unwrap();
+            let en: &f64 = e.literal.downcast_ref().unwrap();
+            assert_eq!(n, en);
         }
     }
 

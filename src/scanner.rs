@@ -78,9 +78,15 @@ impl Scanner {
             }
             b'/' => {
                 if self.match_two_char(b'/') {
-                    while self.peek() == b'\n' && !self.is_at_end() {
+                    while self.peek() != b'\n' && !self.is_at_end() {
                         self.advance();
                     }
+                } else if self.match_two_char(b'*') {
+                    while self.peek() != b'*' && self.peek_next() != b'/' && !self.is_at_end() {
+                        self.advance();
+                    }
+                    self.advance();
+                    self.advance();
                 } else {
                     self.add_empty_token(SLASH);
                 }
@@ -230,7 +236,10 @@ mod tests {
     fn test_scan_single_char_and_double_tokens() {
         let input = "(){},.-+;*
         < > = /
-        <= >= == //
+        <= >= == 
+        // test a comment
+        /* this is a c style comment 
+        it can be multi line */
         ";
 
         let exp = vec![
@@ -251,7 +260,7 @@ mod tests {
             Token::new(LTEQ, "<=", 3), 
             Token::new(GTEQ, ">=", 3), 
             Token::new(EQEQ, "==", 3), 
-            Token::new(EOF, "", 3)
+            Token::new(EOF, "", 6)
         ];
 
         let mut s = Scanner::new(input.to_string());

@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::collections::HashMap;
 
 use crate::token::TokenType;
 use crate::token::TokenType::*;
@@ -176,7 +177,14 @@ impl Scanner {
     fn ident(&mut self) {
         while Self::is_alphanumeric(self.peek()) { self.advance(); }
 
-        self.add_empty_token(IDENT);
+        let keywords = Self::keywords();
+
+        let t = &self.input[self.start..self.current].to_string();
+        
+        match keywords.get(t) {
+            Some(t) => self.add_empty_token(*t),
+            None => self.add_empty_token(IDENT),
+        }
     }
 
     fn is_digit(c: u8) -> bool {
@@ -189,6 +197,27 @@ impl Scanner {
 
     fn is_alphanumeric(c: u8) -> bool {
         Self::is_alpha(c) || Self::is_digit(c)
+    }
+
+    fn keywords() -> HashMap<String, TokenType> {
+        HashMap::from([
+            ("and".to_string(), AND),
+            ("class".to_string(), CLASS),
+            ("else".to_string(), ELSE),
+            ("false".to_string(), FALSE),
+            ("for".to_string(), FOR),
+            ("fun".to_string(), FUN),
+            ("if".to_string(), IF),
+            ("nil".to_string(), NIL),
+            ("or".to_string(), OR),
+            ("print".to_string(), PRINT),
+            ("return".to_string(), RETURN),
+            ("super".to_string(), SUPER),
+            ("this".to_string(), THIS),
+            ("true".to_string(), TRUE),
+            ("var".to_string(), VAR),
+            ("while".to_string(), WHILE),
+        ])
     }
 }
 
@@ -324,6 +353,41 @@ mod tests {
             let ident: &String = t.literal.downcast_ref().unwrap();
             let eident: &String = e.literal.downcast_ref().unwrap();
             assert_eq!(eident, ident);
+        }
+    }
+
+    #[test]
+    fn test_keywords() {
+        let input = "and class else false for fun if nil or print return super this true var while";
+        
+        let exp = vec![
+            Token::new(AND, "and", 1),
+            Token::new(CLASS, "class", 1),
+            Token::new(ELSE, "else", 1),
+            Token::new(FALSE, "false", 1),
+            Token::new(FOR, "for", 1),
+            Token::new(FUN, "fun", 1),
+            Token::new(IF, "if", 1),
+            Token::new(NIL, "nil", 1),
+            Token::new(OR, "or", 1),
+            Token::new(PRINT, "print", 1),
+            Token::new(RETURN, "return", 1),
+            Token::new(SUPER, "super", 1),
+            Token::new(THIS, "this", 1),
+            Token::new(TRUE, "true", 1),
+            Token::new(VAR, "var", 1),
+            Token::new(WHILE, "while", 1),
+            Token::new(EOF, "", 1),
+        ];
+
+        let mut s = Scanner::new(input.to_string());
+        let tokens = s.scan_tokens();
+
+        for (i, e) in exp.into_iter().enumerate() {
+            let t = &tokens[i];
+            assert_eq!(e.token_type, t.token_type);
+            assert_eq!(e.lexeme, t.lexeme);
+            assert_eq!(e.line, t.line);
         }
     }
 }

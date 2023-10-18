@@ -228,8 +228,6 @@ impl Scanner {
 }
 
 mod tests {
-    use std::{any::TypeId, f32::consts::E};
-
     use super::*;
         
     #[test]

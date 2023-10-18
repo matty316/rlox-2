@@ -30,7 +30,7 @@ impl Scanner {
             self.scan_token()
         }   
 
-        self.add_empty_token(EOF);
+        self.tokens.push(Token::new(EOF, "", self.line));
         return &self.tokens;
     }
 
@@ -90,6 +90,8 @@ impl Scanner {
             _ => {
                 if Self::is_digit(c) {
                     self.number();
+                } else if Self::is_alpha(c){
+                    self.ident();
                 } else {
                     Lox::error(self.line, "Unexpected char")
                 }
@@ -121,13 +123,14 @@ impl Scanner {
     }
 
     fn add_empty_token(&mut self, t: TokenType) {
-        let t = Token::new_empty(t, self.line);
+        let text = &self.input[self.start..self.current];
+        let t = Token::new(t, text, self.line);
         self.tokens.push(t);
     }
 
     fn add_token(&mut self, t: TokenType, literal: impl Any) {
         let text = &self.input[self.start..self.current];
-        let t = Token::new(t, text, literal, self.line);
+        let t = Token::new_literal(t, text, literal, self.line);
         self.tokens.push(t)
     }
 
@@ -170,13 +173,27 @@ impl Scanner {
         self.add_token(NUM, n)
     }
 
+    fn ident(&mut self) {
+        while Self::is_alphanumeric(self.peek()) { self.advance(); }
+
+        self.add_empty_token(IDENT);
+    }
+
     fn is_digit(c: u8) -> bool {
         b'0' <= c && c <= b'9'
+    }
+
+    fn is_alpha(c: u8) -> bool {
+        c >= b'a' && c <= b'z' || c >= b'A' && c <= b'Z' || c == b'_'
+    }
+
+    fn is_alphanumeric(c: u8) -> bool {
+        Self::is_alpha(c) || Self::is_digit(c)
     }
 }
 
 mod tests {
-    use std::any::TypeId;
+    use std::{any::TypeId, f32::consts::E};
 
     use super::*;
         
@@ -188,15 +205,33 @@ mod tests {
         ";
 
         let exp = vec![
-            LPAREN, RPAREN, LBRACE, RBRACE, COMMA, DOT, MINUS, PLUS, SEMICOLON,STAR, LT, GT, EQ, SLASH, LTEQ, GTEQ, EQEQ, EOF
+            Token::new(LPAREN, "(", 1), 
+            Token::new(RPAREN, ")", 1), 
+            Token::new(LBRACE, "{", 1), 
+            Token::new(RBRACE, "}", 1), 
+            Token::new(COMMA, ",", 1), 
+            Token::new(DOT, ".", 1), 
+            Token::new(MINUS, "-", 1), 
+            Token::new(PLUS, "+", 1),
+            Token::new(SEMICOLON, ";", 1),
+            Token::new(STAR, "*", 1), 
+            Token::new(LT, "<", 2), 
+            Token::new(GT, ">", 2), 
+            Token::new(EQ, "=", 2), 
+            Token::new(SLASH, "/", 2), 
+            Token::new(LTEQ, "<=", 3), 
+            Token::new(GTEQ, ">=", 3), 
+            Token::new(EQEQ, "==", 3), 
+            Token::new(EOF, "", 3)
         ];
 
         let mut s = Scanner::new(input.to_string());
         let tokens = s.scan_tokens();
         for (i, e) in exp.into_iter().enumerate() {
-            let t = create_token(e, 1);
-            assert_eq!(t.token_type, tokens[i].token_type);
-            assert_eq!(t.lexeme, "");
+            let t = &tokens[i];
+            assert_eq!(e.token_type, t.token_type);
+            assert_eq!(e.lexeme, t.lexeme);
+            assert_eq!(e.line, t.line)
         }
     }
 
@@ -209,9 +244,9 @@ mod tests {
         ";
 
         let exp = vec![
-            create_token(BANG, 2),
-            create_token(LT, 3),
-            create_token(GT, 4),
+            Token::new(BANG, "!", 2),
+            Token::new(LT, "<", 3),
+            Token::new(GT, ">", 4),
         ];
 
         let mut s = Scanner::new(input.to_string());
@@ -224,35 +259,33 @@ mod tests {
     #[test]
     fn test_strings() {
         let input = r#"
-            "string"
+            "this is a string"
         "#;
         
         let mut s = Scanner::new(input.to_string());
         let tokens = s.scan_tokens();
         let t = &tokens[0];
         assert_eq!(t.token_type, STRING);
-        assert_eq!(t.lexeme, "\"string\"");
+        assert_eq!(t.lexeme, "\"this is a string\"");
         let s: &String = t.literal.downcast_ref().unwrap();
-        assert_eq!(s, &"string".to_string());
+        assert_eq!(s, &"this is a string".to_string());
     } 
 
     #[test]
     fn test_numbers() {
         let input = "1
-        34
-        69
-        420
+        34 69 420
         6.9
         42.0
         ";
 
         let exp = vec![
-            Token::new(NUM, "1", 1.0, 1),
-            Token::new(NUM, "34", 34.0, 1),
-            Token::new(NUM, "69", 69.0, 1),
-            Token::new(NUM, "420", 420.0, 1),
-            Token::new(NUM, "6.9", 6.9, 1),
-            Token::new(NUM, "42.0", 42.0, 1),
+            Token::new_literal(NUM, "1", 1.0, 1),
+            Token::new_literal(NUM, "34", 34.0, 2),
+            Token::new_literal(NUM, "69", 69.0, 2),
+            Token::new_literal(NUM, "420", 420.0, 2),
+            Token::new_literal(NUM, "6.9", 6.9, 3),
+            Token::new_literal(NUM, "42.0", 42.0, 4),
         ];
 
         let mut s = Scanner::new(input.to_string());
@@ -262,14 +295,35 @@ mod tests {
             let t = &tokens[i];
             assert_eq!(e.token_type, NUM);
             assert_eq!(e.lexeme, t.lexeme);
+            assert_eq!(e.line, t.line);
             let n: &f64 = t.literal.downcast_ref().unwrap();
             let en: &f64 = e.literal.downcast_ref().unwrap();
             assert_eq!(n, en);
         }
     }
 
-    //Test Helpers
-    fn create_token(t: TokenType, line: u32) -> Token {
-        Token::new_empty(t, line)
+    #[test]
+    fn test_idents() {
+        let input = "
+        num num1
+        ";
+
+        let exp = vec![
+            Token::new(IDENT, "num", 2),
+            Token::new(IDENT, "num1", 2),
+        ];
+
+        let mut s = Scanner::new(input.to_string());
+        let tokens = s.scan_tokens();
+
+        for (i, e) in exp.into_iter().enumerate() {
+            let t = &tokens[i];
+            assert_eq!(e.token_type, IDENT);
+            assert_eq!(e.lexeme, t.lexeme);
+            assert_eq!(e.line, t.line);
+            let ident: &String = t.literal.downcast_ref().unwrap();
+            let eident: &String = e.literal.downcast_ref().unwrap();
+            assert_eq!(eident, ident);
+        }
     }
 }

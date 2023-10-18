@@ -22,7 +22,7 @@ pub(crate) struct Token {
 }
 
 impl Token {
-    pub(crate) fn new(t: TokenType, lexeme: &str, literal: impl Any, line: u32) -> Self {
+    pub(crate) fn new_literal(t: TokenType, lexeme: &str, literal: impl Any, line: u32) -> Self {
         Token {
             token_type: t,
             lexeme: lexeme.to_string(),
@@ -31,7 +31,7 @@ impl Token {
         }
     }
 
-    pub(crate) fn new_empty(t: TokenType, line: u32) -> Self {
-        Token { token_type: t, lexeme: "".to_string(), literal: Box::new(""), line: line }
+    pub(crate) fn new(t: TokenType, lexeme: &str, line: u32) -> Self {
+        Token { token_type: t, lexeme: lexeme.to_string(), literal: Box::new("".to_string()), line: line }
     }
 }
